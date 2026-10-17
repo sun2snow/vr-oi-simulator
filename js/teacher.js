@@ -20,6 +20,7 @@ function triggerTeacherWarning(){
   state.teacherWarnActive = true;
   state.wanderTimer = 0;
   teacher.userData.mode = 'approach';
+  scheduleAutoSave();
 }
 function applyWanderPenalty(){
   if (state.wanderPenaltyApplied) return;
@@ -31,15 +32,8 @@ function applyWanderPenalty(){
   /* 流速：让这 10 分钟虚拟时间在实际 20 秒内跑完 */
   timeScale = 30;
 
-  /* 锁定滑条（开始界面 + 暂停菜单） */
-  ['timeSliderStart', 'timeSlider'].forEach(id => {
-    const e = $(id);
-    if (e){ e.disabled = true; e.style.opacity = '0.4'; }
-  });
-  const sv1 = $('timeValueStart');
-  if (sv1) sv1.textContent = '锁定';
-  const sv2 = $('timeValue');
-  if (sv2) sv2.textContent = '锁定';
+  syncViewUI();
+  persistSave();
 
   /* 模糊提示：不暴露真正原因，但暗示有记录 + 时间异动 */
   toast('监考老师低头在记录本上写了些什么。等你再抬头时，' +

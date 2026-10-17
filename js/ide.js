@@ -167,7 +167,16 @@ function judgeCode(code, prob){
   return judgeUnified(code, prob, KEYWORDS_LIST);
 }
 
+let pendingSubmission = null;
+
+function cancelSubmission(){
+  if (pendingSubmission) clearInterval(pendingSubmission.timer);
+  pendingSubmission = null;
+  $('btnSubmit').disabled = false;
+}
+
 function submitCode(){
+  if (!state.started || state.ended || pendingSubmission) return;
   saveCode();
   const prob = state.problems.find(x => x.id === state.curProb);
   const code = state.code[state.curProb];
@@ -190,12 +199,19 @@ function submitCode(){
   audio.beep(680, 0.06, 0.04);
 
   let prog = 0;
-  const iv = setInterval(() => {
+  const task = { timer: null };
+  pendingSubmission = task;
+  task.timer = setInterval(() => {
+    // 即使回调已进入事件队列，旧任务也不能在结算后写回成绩。
+    if (state.ended || pendingSubmission !== task){
+      clearInterval(task.timer);
+      return;
+    }
     prog += 7 + Math.random() * 12;
     const bar = $('jbar');
     if (bar) bar.style.width = Math.min(100, prog) + '%';
     if (prog >= 100){
-      clearInterval(iv);
+      cancelSubmission();
       const res = judgeCode(code, prob);
       state.score[prob.id] = Math.max(state.score[prob.id] || 0, res.score);
       state.submitCount[prob.id] = (state.submitCount[prob.id] || 0) + 1;
@@ -211,6 +227,8 @@ function submitCode(){
         if (state.problems.every(p => (state.score[p.id] || 0) >= p.max)) unlockAch('full_score');
       } else if (res.score > 0) audio.beep(560, 0.15, 0.045);
       else audio.beep(220, 0.25, 0.05);
+      // 保存的是已落地的成绩、提交次数和成就，而不是评测前的快照。
+      persistSave();
     }
   }, 130);
 }

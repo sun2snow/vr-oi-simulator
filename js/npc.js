@@ -148,6 +148,7 @@ function downNPC(n){
   kickView(0.055, (Math.random() - 0.5) * 0.055);
   hitStop = 0.08;
   toast('你一拳放倒了同学！考场里彻底乱了。', 1600);
+  scheduleAutoSave();
   return true;
 }
 

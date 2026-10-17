@@ -549,7 +549,7 @@ const GUARD_SPEED_BASE = 0.55;
 const GUARD_SPAWN_DIST = 5.0;
 const GUARD_HIT_RADIUS = 0.95;
 const GUARD_PUNCH_RANGE = 2.2;
-const GUARD_MAX_TOTAL = 200;   // 全场最多排出多少保安；耗尽后不再补充
+const GUARD_MAX_TOTAL = 500;   // 全场最多排出多少保安；耗尽后不再补充
 
 /* ---------- 假接触阴影：径向渐变贴片，比真阴影便宜且可随紧张态加深 ---------- */
 const _shadowGeo = new THREE.PlaneGeometry(1, 1);
@@ -668,15 +668,18 @@ function spawnTwoGuards(){
   if (state.ended) return;
   pruneDeadGuards();
 
-  /* 名额耗尽：不再派出新保安 */
-  const n = Math.min(2, guardPoolRemaining());
+  /* 名额耗尽：不再派出新保安；击杀越多，每波人越多（2→3→4） */
+  const wave = 2 + (state.guardKills >= 40 ? 1 : 0) + (state.guardKills >= 120 ? 1 : 0);
+  const n = Math.min(wave, guardPoolRemaining());
   if (n <= 0) return;
 
-  const baseAngles = [
-    Math.random() * Math.PI * 2,
-    Math.random() * Math.PI * 2 + Math.PI
-  ];
-  const speedBonus = Math.min(0.35, state.guardKills * 0.04);
+  /* 均匀分布在玩家四周，形成合围，而不是随机扎堆 */
+  const a0 = Math.random() * Math.PI * 2;
+  const baseAngles = [];
+  for (let i = 0; i < n; i++) baseAngles.push(a0 + i * Math.PI * 2 / n);
+  const speedBonus = Math.min(0.75, state.guardKills * 0.015);
+  const k = state.guardKills;
+  const eliteP = Math.min(0.85, k / 120);   /* 精英（多血）概率随击杀上升 */
 
   for (let i = 0; i < n; i++){
     let angle = baseAngles[i];
@@ -694,9 +697,18 @@ function spawnTwoGuards(){
     }
 
     const g = buildSecurityGuard(gx, gz);
+    /* 血量：1 / 2 / 3 拳；精英体型更大 */
+    let hp = 1;
+    if (Math.random() < eliteP) hp = 2;
+    if (k >= 100 && Math.random() < Math.min(0.5, (k - 100) / 200)) hp = 3;
+    if (hp > 1) g.group.scale.setScalar(1 + 0.08 * hp);
     g.userData = {
-      speed: GUARD_SPEED_BASE + speedBonus,
-      alive: true
+      speed: GUARD_SPEED_BASE + speedBonus * (hp > 1 ? 1.1 : 1) + Math.random() * 0.08,
+      alive: true,
+      hp, maxHp: hp,
+      flank: Math.random() < 0.5 ? 1 : -1,   /* 绕左还是绕右 */
+      lungeT: 0, lungeCd: 1 + Math.random() * 1.5,
+      stagger: 0
     };
     securityGuards.push(g);
     state.guardsSpawned = (state.guardsSpawned || 0) + 1;

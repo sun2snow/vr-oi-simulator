@@ -96,7 +96,7 @@ function updatePlayer(dt){
     state.bob += dt * 1.2;
   }
   const bobY = moving ? Math.sin(state.bob) * 0.022 : Math.sin(state.bob) * 0.004;
-  camera.position.set(state.pos.x, 1.65 + bobY, state.pos.z);
+  camera.position.set(state.pos.x, 1.65 + jumpY + bobY, state.pos.z);
   camera.rotation.set(state.pitch, state.yaw, 0, 'YXZ');
   /* 回弹是纯视觉叠加，不写回 state.yaw/pitch，不影响真实朝向 */
   camera.rotation.x += recoilPitch;
@@ -114,7 +114,7 @@ let jumpY = 0, velY = 0, onGround = true;
 const _jumpSafe = new THREE.Vector3(0, 0, -2.08);
 
 function tryJump(){
-  if (!onGround || state.view !== 'world' || state.ended) return;
+  if (!onGround || !state.started || state.view !== 'world' || state.ended || state.frozen) return;
   velY = JUMP_VELOCITY;
   onGround = false;
   _jumpSafe.set(state.pos.x, 0, state.pos.z);   /* 记下起跳点，落地回溯用 */

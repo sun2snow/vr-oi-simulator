@@ -44,7 +44,7 @@ const CONTEST_LEN = 4 * 3600;
 const state = {
   started: false, ended: false, frozen: false,
   view: 'world',
-  elapsed: 0,
+  elapsed: 0, realElapsed: 0,  // 比赛时间与真实游玩用时分别累计
   yaw: 0, pitch: 0,
   pos: new THREE.Vector3(0, 1.65, -1.72),
   keys: {},
@@ -62,10 +62,20 @@ const state = {
   guardKills: 0, submitCount: {}, achievements: new Set(),
   guardsSpawned: 0,
   defiance: 0,                // 违抗保安通报的次数（推高紧张值）
+  guardGraceUntil: 0, punchLockUntil: 0,
   startTime: 0,
   wanderCount: 0,              // 离开座位触发警告的次数
   wanderPenaltyApplied: false  // 是否已触发"时间锁定"惩罚
 };
+
+/* 考试时钟不使用物理步长限幅；只累计在线游玩时间，不计离线时间。 */
+function advanceContestTime(dt){
+  if (!state.started || state.ended || !Number.isFinite(dt) || dt <= 0) return false;
+  const remaining = Math.max(0, CONTEST_LEN - state.elapsed);
+  state.realElapsed += Math.min(dt, remaining / timeScale);
+  state.elapsed = Math.min(CONTEST_LEN, state.elapsed + dt * timeScale);
+  return state.elapsed >= CONTEST_LEN;
+}
 
 /* ---------- 性能：几何 / 材质缓存 ---------- */
 const geoCache = new Map();
@@ -266,8 +276,18 @@ function syncViewUI(){
   ['turnValueStart', 'turnValue'].forEach(id => { const e = $(id); if (e) e.textContent = mouseSens.toFixed(1); });
   ['smoothSliderStart', 'smoothSlider'].forEach(id => { const e = $(id); if (e) e.value = smv; });
   ['smoothValueStart', 'smoothValue'].forEach(id => { const e = $(id); if (e) e.textContent = smv + '%'; });
-  ['timeSliderStart', 'timeSlider'].forEach(id => { const e = $(id); if (e) e.value = timeScale; });
-  ['timeValueStart', 'timeValue'].forEach(id => { const e = $(id); if (e) e.textContent = Math.round(timeScale) + '×'; });
+  ['timeSliderStart', 'timeSlider'].forEach(id => {
+    const e = $(id);
+    if (e){
+      e.value = timeScale;
+      e.disabled = state.wanderPenaltyApplied;
+      e.style.opacity = state.wanderPenaltyApplied ? '0.4' : '';
+    }
+  });
+  ['timeValueStart', 'timeValue'].forEach(id => {
+    const e = $(id);
+    if (e) e.textContent = state.wanderPenaltyApplied ? '锁定' : Math.round(timeScale) + '×';
+  });
   ['volSliderStart', 'volSlider'].forEach(id => { const e = $(id); if (e) e.value = volv; });
   ['volValueStart', 'volValue'].forEach(id => { const e = $(id); if (e) e.textContent = volv + '%'; });
   const mt = $('muteToggle');

@@ -105,6 +105,12 @@ function bindEvents(){
   });
 
   window.addEventListener('blur', () => { state.keys = {}; });
+  const flushProgress = () => {
+    tickContestClock();
+    persistSave();
+  };
+  document.addEventListener('visibilitychange', flushProgress);
+  window.addEventListener('pagehide', flushProgress);
 
   /* ---------- 指针锁定 ---------- */
   document.addEventListener('pointerlockchange', () => {
@@ -161,8 +167,12 @@ function bindEvents(){
   bindSlider('turnSlider',        v => mouseSens = sliderToSens(v));
   bindSlider('smoothSliderStart', v => smoothAmount = v / 100);
   bindSlider('smoothSlider',      v => smoothAmount = v / 100);
-  bindSlider('timeSliderStart',   v => timeScale = v);
-  bindSlider('timeSlider',        v => timeScale = v);
+  const setTimeScale = v => {
+    tickContestClock(); // 先按旧倍率结算这一段真实时间
+    if (!state.wanderPenaltyApplied) timeScale = v;
+  };
+  bindSlider('timeSliderStart', setTimeScale);
+  bindSlider('timeSlider', setTimeScale);
   bindSlider('volSliderStart',    v => audio.setVolume(v / 100));
   bindSlider('volSlider',         v => audio.setVolume(v / 100));
 
@@ -205,7 +215,11 @@ function bindEvents(){
       endContest(true);
     }
   };
-  $('btnSave').onclick = () => { persistSave(); toast('进度已保存', 1200); };
+  $('btnSave').onclick = () => {
+    tickContestClock();
+    if (state.ended) return;
+    toast(persistSave() ? '进度已保存' : '保存失败，请检查浏览器存储权限或空间。', 1600);
+  };
   $('btnClearSave').onclick = () => { clearSave(); toast('存档已清除', 1200); };
 
   $('btnSettings').onclick = openPauseMenu;
@@ -253,6 +267,7 @@ function bindEvents(){
     if (confirm('确定要重置本题代码吗？')){
       codeArea.value = p.starter;
       state.code[state.curProb] = p.starter;
+      scheduleAutoSave();
       scheduleHighlight();
     }
   };
@@ -287,7 +302,7 @@ function bindEvents(){
     /* 点击按钮是用户手势，此时申请指针锁定成功率最高 */
     requestLock();
     /* 尝试恢复存档 */
-    if (tryLoadSave()) toast('已恢复上次的答题进度。', 2200);
+    if (tryLoadSave()) toast('已恢复上次的战斗与答题进度。', 2200);
   };
 }
 
@@ -300,7 +315,7 @@ let hitStop = 0;                // 命中顿帧剩余时间（出拳命中时置
 let worldTimeScale = 1;         // 全局世界时间倍率（通报弹窗期间的子弹时间）
 let slowMoDlg = null;           // 引发慢放的弹窗；它一消失就恢复原速
 
-/* 世界时间步长：顿帧 × 全局慢放。考试计时（state.elapsed）用 realDt，
+/* 世界时间步长：顿帧 × 全局慢放。考试计时另用未限幅的 rawDt，
    不受这里影响——慢的是世界，不是钟。 */
 function worldDtFor(realDt){
   const hs = hitStop > 0 ? 0.12 : 1;
@@ -321,14 +336,28 @@ const VIEW_NO_RENDER = new Set([
   'code','paper','corridor','bathroom','npcComputer','ending','pause'
 ]);
 
+/* 考试用原始时间差；角色/碎块积分仍限幅，后台恢复时不会瞬移。 */
+function tickContestClock(){
+  if (!clock) return 0;
+  const dt = Math.max(0, clock.getDelta());
+  if (advanceContestTime(dt)) endContest(false);
+  return dt;
+}
+
+let progressSaveElapsed = 0;
 function animate(){
   requestAnimationFrame(animate);
-  const realDt = Math.min(clock.getDelta(), 0.1);
+  const rawDt = tickContestClock();
+  const realDt = Math.min(rawDt, 0.1);
   const t = performance.now() * 0.001;
 
+  // 战斗不经过编辑器也会自动保存，持续输入不会饿死这条保存路径。
   if (state.started && !state.ended){
-    state.elapsed += realDt * timeScale;
-    if (state.elapsed >= CONTEST_LEN) endContest(false);
+    progressSaveElapsed += rawDt;
+    if (progressSaveElapsed >= 5){
+      progressSaveElapsed = 0;
+      persistSave();
+    }
   }
 
   /* 命中顿帧：命中瞬间世界逻辑减速到 12%，相机/UI/计时不受影响 */
@@ -362,7 +391,7 @@ function animate(){
   if (state.doorOpen) updateDoorLight(realDt);
 
   /* 世界逻辑：只在世界视图下运行，避免在 IDE / 草稿纸里空跑 NPC 与 AI */
-  if (inWorld){
+  if (inWorld && !state.ended){
     updateNPCs(worldDt, t);
 
     /* 老师 AI */
@@ -467,13 +496,16 @@ function animate(){
       hudTimer.classList.toggle('warn', remain < 1800);
     }
     const alive = aliveGuardCount();
-    const key = `${state.totalScore}|${state.warnCount}|${alive}`;
+    const key = `${state.totalScore}|${state.warnCount}|${alive}|${state.guardKills}|${state.teacherDown}`;
     if (hudScore.dataset.key !== key){
       hudScore.dataset.key = key;
       const guardInfo = alive > 0
         ? `　<span style="color:#ff6b78;font-size:16px">\u26A0 保安 ${alive}</span>`
         : '';
-      hudScore.innerHTML =
+      const battleInfo = state.teacherDown
+        ? `击倒 <b>${state.guardKills}</b> / ${GUARD_MAX_TOTAL}　·　`
+        : '';
+      hudScore.innerHTML = battleInfo +
         `总分 <b>${state.totalScore}</b> / 400　` +
         `<span style="color:#5d6880;font-size:16px">警告 ${state.warnCount} 次</span>${guardInfo}`;
     }

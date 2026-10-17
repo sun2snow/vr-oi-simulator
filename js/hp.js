@@ -70,6 +70,7 @@ function damagePlayer(g, now){
       g.group.position.x = state.pos.x + dx / len * 1.6;
       g.group.position.z = state.pos.z + dz / len * 1.6;
     }
+    persistSave();
     return true;
   }
   return false;   /* 血量耗尽 → 由调用方走结局 */

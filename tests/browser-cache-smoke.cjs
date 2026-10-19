@@ -31,7 +31,7 @@ const server = http.createServer((req, res) => {
     '--enable-unsafe-swiftshader', '--use-gl=angle', '--use-angle=swiftshader',
     '--remote-debugging-port=0', '--no-first-run', '--no-default-browser-check',
     '--user-data-dir=' + profile, 'about:blank']);
-  let socket;
+  let socket, closeBrowser;
   const timeout = setTimeout(() => { console.error('Browser test timed out'); chrome.kill(); process.exitCode = 1; }, 90000);
   try {
     const endpoint = await new Promise((resolve, reject) => {
@@ -60,6 +60,7 @@ const server = http.createServer((req, res) => {
       const id = ++seq; pending.set(id, { resolve, reject });
       socket.send(JSON.stringify({ id, method, params, ...(session ? { sessionId: session } : {}) }));
     });
+    closeBrowser = () => call('Browser.close', {}, null);
     const { targetId } = await call('Target.createTarget', { url: 'about:blank' });
     ({ sessionId } = await call('Target.attachToTarget', { targetId, flatten: true }));
     await call('Runtime.enable'); await call('Page.enable'); await call('Network.enable');
@@ -117,10 +118,18 @@ const server = http.createServer((req, res) => {
     console.log('New version activates after closing the game; old cache cleaned; offline launch: OK');
   } finally {
     clearTimeout(timeout);
+    const exited = new Promise(resolve => {
+      if (chrome.exitCode !== null || !chrome.pid) resolve(); else chrome.once('exit', resolve);
+    });
+    const killTimer = setTimeout(() => chrome.kill(), 3000);
+    // 正常关闭让 Chromium 的缓存进程先退出，避免删 profile 时仍有子进程写入。
+    if (closeBrowser && socket?.readyState === WebSocket.OPEN)
+      await Promise.race([closeBrowser().catch(() => {}), exited]);
+    else chrome.kill();
+    await exited;
+    clearTimeout(killTimer);
     if (socket) socket.close();
-    chrome.kill();
-    await new Promise(resolve => { if (chrome.exitCode !== null || !chrome.pid) resolve(); else chrome.once('exit', resolve); });
     server.closeAllConnections(); server.close();
-    fs.rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    fs.rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 })().catch(error => { console.error(error); server.close(); process.exitCode = 1; });

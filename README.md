@@ -23,10 +23,10 @@
 
 ## 在线游玩
 
-[**点击进入考场**](https://sun2snow.github.io/vr-oi-simulator/)
+[**点击进入考场：vr-oi.sun2snow.dpdns.org**](https://vr-oi.sun2snow.dpdns.org/)
 
-使用桌面浏览器打开链接，无需下载或注册。目标自定义域名为
-`vr-oi.sun2snow.dpdns.org`，域名接入步骤见下文部署说明。
+使用桌面浏览器打开链接，无需下载或注册。站点由 GitHub Pages 托管，
+通过自定义域名与 HTTPS 访问；首次缓存完成后支持离线重新打开。
 
 ## 快速开始
 

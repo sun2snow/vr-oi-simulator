@@ -23,10 +23,8 @@
 
 ## 在线游玩
 
-[**点击进入考场：vr-oi.sun2snow.dpdns.org**](https://vr-oi.sun2snow.dpdns.org/)
-
-使用桌面浏览器打开链接，无需下载或注册。站点由 GitHub Pages 托管，
-通过自定义域名与 HTTPS 访问；首次缓存完成后支持离线重新打开。
+在线版本见仓库首页的 **Website** 入口。使用桌面浏览器打开，无需下载或注册；
+首次缓存完成后支持离线重新打开。
 
 ## 快速开始
 
@@ -112,8 +110,7 @@ js/
   main.js             事件绑定 / 主循环 / 初始化入口
   cache.js            离线缓存注册 / 缓存就绪与更新提示
 vendor/               固定版本 Three.js 与其 MIT 许可
-scripts/              静态站点打包 / Service Worker 模板
-.github/workflows/    自动测试与 GitHub Pages 部署
+scripts/              平台无关的游戏资源打包 / Service Worker 模板
 ```
 
 JS 全部是传统脚本（非 ES Module），按 index.html 中的顺序加载并共享全局作用域，
@@ -188,9 +185,7 @@ JS 全部是传统脚本（非 ES Module），按 index.html 中的顺序加载�
   物理步长仍限幅，恢复页面时不会因大步长穿墙。实际用时独立累计，不受倍率修改影响。
 - 所有结局都会取消未完成的评测/增援并清除本局存档；未完成评测不计入结算。
 
-## 网站缓存与部署
-
-### 缓存策略
+## 离线缓存
 
 - **整版缓存**：HTML、JS、CSS、题库与 Three.js 一起预缓存，每个文件都有 SHA-256 完整性校验。
   所有文件成功下载后才启用新版本，避免 CDN 传播过程中混用新旧脚本。
@@ -199,40 +194,23 @@ JS 全部是传统脚本（非 ES Module），按 index.html 中的顺序加载�
   不强制刷新或中断战斗；切换后只清理本站旧资源缓存。
 - **不影响存档**：资源缓存使用 Cache Storage，答题与战斗存档使用 localStorage。
   浏览器的“清除网站数据”可能同时删除两者，请谨慎操作；浏览器也可能自动回收资源缓存。
-  不同域名的缓存和存档相互隔离，从 GitHub Pages 地址切到自定义域名不会自动迁移存档。
+  不同网站地址的缓存和存档相互隔离，不会自动迁移。
 - **失败恢复**：临时网络或证书传播失败最多自动重试两次，也可点击“重试离线缓存”。
   若仍失败，展开“查看缓存错误”复制错误和脚本地址反馈；权限限制需调整浏览器设置，
   不要为排查缓存问题清除本站存档。
 - **启用条件**：离线缓存需要 HTTPS（本机 localhost 也支持）；首次缓存完成前需要联网。
   离线游玩时不会检查更新，恢复联网后重新打开即可。
 
-### 自动发布
-
-推送 `main` 会触发 `.github/workflows/pages.yml`：运行测试、构建 `_site/`、部署 GitHub Pages。
-只发布运行游戏所需的文件；资源或缓存逻辑变化时自动生成新缓存版本，无需手动改版本号。
-
-本地预览缓存功能（Node.js 18+，以下 HTTP 服务命令需 Python 3）：
+通用资源打包命令：
 
 ```sh
 node scripts/build-site.cjs
-python3 -m http.server 8080 --directory _site
-# 打开 http://localhost:8080
 ```
 
-### 自定义域名
+输出位于 `_site/`，包含游戏资源与带版本和完整性校验的 Service Worker，
+不依赖特定域名或托管平台。直接打开源目录的 `index.html` 玩游戏无需此步骤。
 
-DNS 区域为 `sun2snow.dpdns.org` 时添加：
-
-| 类型 | 名称 | 目标 | Cloudflare 代理 |
-| --- | --- | --- | --- |
-| CNAME | `vr-oi` | `sun2snow.github.io` | 先使用 DNS only（灰云） |
-
-在仓库 **Settings → Pages → Custom domain** 中绑定 `vr-oi.sun2snow.dpdns.org`，
-待 DNS 校验和证书签发完成后开启 **Enforce HTTPS**。目标不能包含协议或仓库路径。
-使用 Actions 发布时，以 Pages 设置中的域名为准，不依赖仓库 `CNAME` 文件。
-
-GitHub Pages 提供 HTTP 缓存，浏览器 Service Worker 提供上述离线缓存。
-无需额外设置 Cloudflare “Cache Everything”；不要为 `sw.js` 配置长时间边缘缓存，以免延迟版本检查。
+本仓库仅维护游戏代码、资源和通用测试；个人域名、发布流程、本机验证工具及私有配置不随代码提交。
 
 ## 回归测试
 
@@ -243,15 +221,8 @@ node --test tests/*.test.cjs
 ```
 
 测试覆盖评测保存与结算竞态、处罚和战斗读档、500 人名额与终局、考试计时及跳跃。
-另有真实 Chrome 离线加载与更新切换验收（需 Node.js 22+ 和本机 Chrome/Chromium）：
-
-```sh
-node tests/browser-cache-smoke.cjs
-# 如果浏览器不叫 google-chrome，可设置 CHROME_BIN 为浏览器可执行文件路径。
-```
-
-此脚本验证 WebGL 初始化、断网启动、更新不打断战斗及旧缓存清理。
-战斗手感与指针锁定仍需手动试玩验收。
+另有缓存构建、离线读取、更新策略和失败恢复测试；测试使用虚构域名，不依赖实际网站。
+WebGL 渲染、战斗手感与指针锁定仍需浏览器试玩验收。
 
 ## 反馈与贡献
 

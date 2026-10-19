@@ -25,7 +25,7 @@ function fixture(register){
   const navigator = { onLine: true, serviceWorker: { register: async () => register(++calls, active) } };
   const window = emitter({ isSecureContext: true });
   vm.runInNewContext(code, {
-    URL, WeakSet, location: { protocol: 'https:', href: 'https://vr-oi.sun2snow.dpdns.org/' },
+    URL, WeakSet, location: { protocol: 'https:', href: 'https://game.example.test/' },
     navigator, window, console: { warn(){} },
     document: {
       readyState: 'complete', getElementById: () => status,
@@ -53,7 +53,7 @@ test('transient registration failure retries automatically and clears the error 
   assert.equal(f.calls(), 1);
   assert.match(f.status.textContent, /自动重试/);
   assert.match(f.diagnostic().textContent, /TypeError: Failed to fetch/);
-  assert.match(f.diagnostic().textContent, /https:\/\/vr-oi\.sun2snow\.dpdns\.org\/sw\.js/);
+  assert.match(f.diagnostic().textContent, /https:\/\/game\.example\.test\/sw\.js/);
   await f.fireTimer();
   assert.equal(f.calls(), 2);
   assert.match(f.status.textContent, /游戏资源已缓存/);

@@ -1,1 +1,8 @@
+# Generated game assets
 _site/
+
+# Machine-specific checks, deployment configuration and private notes
+.local/
+.env
+.env.*
+!.env.example

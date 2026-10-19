@@ -62,6 +62,9 @@ test('site build is deterministic and all cached files have matching SHA-256 int
   assert.ok(manifest.some(x => x.path === 'vendor/three.min.js'));
   assert.ok(manifest.some(x => x.path === 'js/cache.js'));
   assert.equal(fs.existsSync(path.join(root, '_site/tests')), false);
+  assert.equal(fs.existsSync(path.join(root, '_site/.local')), false);
+  assert.equal(fs.existsSync(path.join(root, '_site/.github')), false);
+  assert.equal(fs.existsSync(path.join(root, '_site/.nojekyll')), false);
   execFileSync(process.execPath, ['scripts/build-site.cjs'], { cwd: root });
   assert.equal(fs.readFileSync(path.join(root, '_site/sw.js'), 'utf8'), worker);
 });
@@ -103,9 +106,9 @@ test('activation cleans only this scope; updates never forcibly take over a runn
 });
 
 test('custom domain root uses the same offline shell as project-subpath hosting', async () => {
-  const f = fixture('https://vr-oi.sun2snow.dpdns.org/');
+  const f = fixture('https://game.example.test/');
   await f.lifecycle('install');
-  assert.equal((await f.request('https://vr-oi.sun2snow.dpdns.org/', 'navigate')).status, 200);
+  assert.equal((await f.request('https://game.example.test/', 'navigate')).status, 200);
 });
 
 test('incomplete cache while offline returns a useful error, not unrelated HTML as JavaScript', async () => {

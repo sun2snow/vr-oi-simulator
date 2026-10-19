@@ -27,7 +27,8 @@ const worker = template.replace('__CACHE_VERSION__', version)
   .replace('/* __ASSETS__ */ []', JSON.stringify(assets, null, 2));
 
 fs.rmSync(output, { recursive: true, force: true });
-for (const file of [...files, 'LICENSE', '.nojekyll']){
+// 只输出平台无关的游戏资源，不混入托管平台专用配置。
+for (const file of [...files, 'LICENSE']){
   const dest = path.join(output, file);
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   fs.copyFileSync(path.join(root, file), dest);

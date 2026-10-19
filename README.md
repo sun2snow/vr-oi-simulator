@@ -21,6 +21,13 @@
 > 名称中的“VR”指沉浸式第一人称体验；当前版本使用键盘和鼠标操作，未实现 VR 头显 / WebXR 支持。
 > 游戏中的人物、纪律处理和暴力情节均为虚构娱乐设定。
 
+## 在线游玩
+
+[**点击进入考场**](https://sun2snow.github.io/vr-oi-simulator/)
+
+使用桌面浏览器打开链接，无需下载或注册。目标自定义域名为
+`vr-oi.sun2snow.dpdns.org`，域名接入步骤见下文部署说明。
+
 ## 快速开始
 
 ```sh
@@ -32,8 +39,9 @@ cd vr-oi-simulator
 也可以在 GitHub 下载仓库 ZIP，解压后打开该文件。
 
 - **推荐环境**：桌面版 Chrome / Edge / Firefox，配合键盘与鼠标；当前没有触屏操作方案。
-- **网络要求**：需访问 `cdn.jsdelivr.net` 加载 Three.js；失败时页面会给出提示。
-  如需离线运行，可将对应版本的 Three.js（`0.128.0`）下载到本地，并修改 `index.html` 的脚本路径。
+- **网络要求**：Three.js `0.128.0` 已随站点放在 `vendor/`，不再依赖外部 CDN。
+  网页版首次访问需联网；开始界面提示“游戏资源已缓存”后可离线重新打开。
+  下载完整仓库后，通过本地 `index.html` 也可直接离线运行。
 - **鼠标锁定**：进入考场后鼠标用于转动视角；锁定失败时点击场景重试。
 - **舒适度设置**：可调整鼠标灵敏度、视角平滑、音量和时间流速，也可关闭镜头晃动。
 
@@ -102,6 +110,10 @@ js/
   save.js             进度存档读写（localStorage）
   ending.js           比赛结算与结局分支
   main.js             事件绑定 / 主循环 / 初始化入口
+  cache.js            离线缓存注册 / 缓存就绪与更新提示
+vendor/               固定版本 Three.js 与其 MIT 许可
+scripts/              静态站点打包 / Service Worker 模板
+.github/workflows/    自动测试与 GitHub Pages 部署
 ```
 
 JS 全部是传统脚本（非 ES Module），按 index.html 中的顺序加载并共享全局作用域，
@@ -176,6 +188,49 @@ JS 全部是传统脚本（非 ES Module），按 index.html 中的顺序加载�
   物理步长仍限幅，恢复页面时不会因大步长穿墙。实际用时独立累计，不受倍率修改影响。
 - 所有结局都会取消未完成的评测/增援并清除本局存档；未完成评测不计入结算。
 
+## 网站缓存与部署
+
+### 缓存策略
+
+- **整版缓存**：HTML、JS、CSS、题库与 Three.js 一起预缓存，每个文件都有 SHA-256 完整性校验。
+  所有文件成功下载后才启用新版本，避免 CDN 传播过程中混用新旧脚本。
+- **缓存优先**：已缓存的游戏资源直接从浏览器读取，减少重复请求；未知地址与非 GET 请求不缓存。
+- **安全更新**：每次打开网站检查新版本，下载完成后提示。关闭所有游戏标签页再打开才切换版本，
+  不强制刷新或中断战斗；切换后只清理本站旧资源缓存。
+- **不影响存档**：资源缓存使用 Cache Storage，答题与战斗存档使用 localStorage。
+  浏览器的“清除网站数据”可能同时删除两者，请谨慎操作；浏览器也可能自动回收资源缓存。
+  不同域名的缓存和存档相互隔离，从 GitHub Pages 地址切到自定义域名不会自动迁移存档。
+- **启用条件**：离线缓存需要 HTTPS（本机 localhost 也支持）；首次缓存完成前需要联网。
+  离线游玩时不会检查更新，恢复联网后重新打开即可。
+
+### 自动发布
+
+推送 `main` 会触发 `.github/workflows/pages.yml`：运行测试、构建 `_site/`、部署 GitHub Pages。
+只发布运行游戏所需的文件；资源或缓存逻辑变化时自动生成新缓存版本，无需手动改版本号。
+
+本地预览缓存功能（Node.js 18+，以下 HTTP 服务命令需 Python 3）：
+
+```sh
+node scripts/build-site.cjs
+python3 -m http.server 8080 --directory _site
+# 打开 http://localhost:8080
+```
+
+### 自定义域名
+
+DNS 区域为 `sun2snow.dpdns.org` 时添加：
+
+| 类型 | 名称 | 目标 | Cloudflare 代理 |
+| --- | --- | --- | --- |
+| CNAME | `vr-oi` | `sun2snow.github.io` | 先使用 DNS only（灰云） |
+
+在仓库 **Settings → Pages → Custom domain** 中绑定 `vr-oi.sun2snow.dpdns.org`，
+待 DNS 校验和证书签发完成后开启 **Enforce HTTPS**。目标不能包含协议或仓库路径。
+使用 Actions 发布时，以 Pages 设置中的域名为准，不依赖仓库 `CNAME` 文件。
+
+GitHub Pages 提供 HTTP 缓存，浏览器 Service Worker 提供上述离线缓存。
+无需额外设置 Cloudflare “Cache Everything”；不要为 `sw.js` 配置长时间边缘缓存，以免延迟版本检查。
+
 ## 回归测试
 
 无需安装依赖，使用 Node.js 18+：
@@ -185,7 +240,15 @@ node --test tests/*.test.cjs
 ```
 
 测试覆盖评测保存与结算竞态、处罚和战斗读档、500 人名额与终局、考试计时及跳跃。
-浏览器中的 WebGL 渲染和指针锁定仍需手动验收。
+另有真实 Chrome 离线加载与更新切换验收（需 Node.js 22+ 和本机 Chrome/Chromium）：
+
+```sh
+node tests/browser-cache-smoke.cjs
+# 如果浏览器不叫 google-chrome，可设置 CHROME_BIN 为浏览器可执行文件路径。
+```
+
+此脚本验证 WebGL 初始化、断网启动、更新不打断战斗及旧缓存清理。
+战斗手感与指针锁定仍需手动试玩验收。
 
 ## 反馈与贡献
 
@@ -200,4 +263,5 @@ node --test tests/*.test.cjs
 本项目基于 [aakaakii/vr-oi-simulator](https://github.com/aakaakii/vr-oi-simulator) 继续开发，
 感谢原项目作者与贡献者。当前仓库以独立仓库形式维护，保留原有版权声明。
 
-代码采用 [MIT License](LICENSE)。
+代码采用 [MIT License](LICENSE)。随站点分发的 Three.js 使用其原有
+[MIT 许可](vendor/three.LICENSE)，版本为 `0.128.0`。

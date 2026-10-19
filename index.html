@@ -79,6 +79,9 @@
     font-size:12px;cursor:pointer;font-family:inherit;letter-spacing:2px">
   清空存档
   </button>
+  <p id="cacheStatus" role="status" aria-live="polite" style="font-size:12px;color:#aebdd8;text-align:center;margin:14px 20px">
+    首次在线加载后可缓存游戏资源。
+  </p>
 </div>
 
 <!-- ===================== 暂停菜单 ===================== -->
@@ -232,16 +235,16 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="vendor/three.min.js"></script>
 
-<!-- Three.js 加载失败兜底（需紧跟 CDN 脚本尽早执行） -->
+<!-- Three.js 随站点部署；加载失败时尽早提示 -->
 <script>
 if (typeof THREE === 'undefined'){
   document.getElementById('start').innerHTML =
     '<div style="padding:80px 20px;text-align:center;color:#f88;font-size:16px;line-height:2">' +
     '? Three.js 加载失败<br>' +
-    '<span style="font-size:13px;color:#aaa">请检查网络能否访问 cdn.jsdelivr.net，' +
-    '或下载 three.min.js 到本地后改用相对路径</span></div>';
+    '<span style="font-size:13px;color:#aaa">请检查 vendor/three.min.js 是否完整，' +
+    '或联网后重新打开页面</span></div>';
   throw new Error('THREE not loaded');
 }
 </script>
@@ -290,5 +293,6 @@ if (typeof THREE === 'undefined'){
 <script src="js/save.js"></script>
 <script src="js/ending.js"></script>
 <script src="js/main.js"></script>
+<script src="js/cache.js"></script>
 </body>
 </html>
